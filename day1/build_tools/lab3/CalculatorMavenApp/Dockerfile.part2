@@ -1,0 +1,21 @@
+
+# Use a Java 17 runtime image
+FROM eclipse-temurin:17-jre
+
+# Set the working directory
+WORKDIR /app
+
+# Create a non-root user
+RUN useradd --create-home appuser
+
+# Copy the locally built JAR
+COPY --chown=appuser:appuser target/calculator.jar app.jar
+
+# Run the application as a non-root user
+USER appuser
+
+# Expose the application port
+EXPOSE 8080
+
+# Start the calculator
+CMD ["java", "-jar", "app.jar"]

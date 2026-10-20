@@ -4,7 +4,7 @@
 
 This lab demonstrates a simple Java calculator project managed with Maven. The project includes calculator operations and a JUnit 5 test suite.
 
-![lab](../images/lab.png)
+![lab](images/lab.png)
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ java -version
 mvn -version
 ```
 
-![Java and Maven versions](../images/1.png)
+![Java and Maven versions](images/1.png)
 
 ## Run the Unit Tests
 
@@ -36,7 +36,7 @@ The Maven test run completed successfully:
 - Skipped: 0
 - Build status: `BUILD SUCCESS`
 
-![Unit test results](../images/2.png)
+![Unit test results](images/2.png)
 
 ## Build the Application
 
@@ -48,11 +48,11 @@ mvn package
 
 The build creates `target/calculator.jar`.
 
-![Maven package build](../images/3.png)
+![Maven package build](images/3.png)
 
 The generated artifact is shown below:
 
-![Generated JAR file](../images/4.png)
+![Generated JAR file](images/4.png)
 
 ## Run the Application
 
@@ -64,7 +64,7 @@ java -jar target/calculator.jar
 
 Enter two numbers when prompted. The application displays their sum, difference, product, and quotient.
 
-![Calculator application running](../images/lab1.gif)
+![Calculator application running](images/lab1.gif)
 
 ## Conclusion
 

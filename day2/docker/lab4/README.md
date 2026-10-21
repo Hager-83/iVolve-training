@@ -1,216 +1,238 @@
-# Lab 4: Docker Image Optimization and Export/Load
+# Lab 5: Docker Image Vulnerability Scanning with Trivy
 
 ![Lab Overview](images/lab.png)
 
-## 1. Before Optimization
+## 1. Build and Scan the Initial Docker Image
 
-The original Dockerfile uses Maven and JDK to build and run the Spring Boot application in the same image.
+Build the initial Docker image before applying security improvements.
 
 ### Build the original image
 
 ```bash
-docker build -t image1 .
+docker build -t ivolve-app:v1 .
 ```
 
-### Check the image size
+### Check the image
 
 ```bash
-docker images image1
+docker images ivolve-app:v1
 ```
 
-**Image size before optimization:**
+### Scan the image with Trivy
 
-| Image | Disk Usage | Content Size |
-|---|---:|---:|
-| `image1:latest` | 671 MB | 239 MB |
-
-![Original Image](images/1.png)
-
-### Run the container
+Run a complete vulnerability scan:
 
 ```bash
-docker run -d --name container1 -p 8080:8080 image1
+trivy image ivolve-app:v1
 ```
 
-Check the running container and application logs:
+To display only HIGH and CRITICAL vulnerabilities:
+
+```bash
+trivy image --severity HIGH,CRITICAL ivolve-app:v1
+```
+
+The scan identifies known vulnerabilities in the image's operating system packages and application dependencies.
+
+![Initial Trivy Scan](images/1.png)
+
+---
+
+## 2. Generate Trivy Scan Reports
+
+Trivy supports exporting scan results into different formats for easier inspection and documentation.
+
+### Generate an HTML report
+
+```bash
+trivy image --format template --template "@html.tpl" -o trivy-report.html ivolve-app:v1
+```
+
+### Generate a report for HIGH and CRITICAL vulnerabilities
+
+```bash
+trivy image --severity HIGH,CRITICAL --format template --template "@html.tpl" -o trivy-high-critical.html ivolve-app:v1
+```
+
+### Open the reports
+
+```bash
+xdg-open trivy-report.html
+xdg-open trivy-high-critical.html
+```
+
+The HTML reports provide a readable summary of the detected vulnerabilities, including their severity and affected packages.
+
+![Trivy HTML Report](images/2.png)
+
+![High and Critical Vulnerabilities](images/3.png)
+
+---
+
+## 3. Inspect and Update Application Dependencies
+
+Application dependencies can introduce vulnerabilities even when the application itself works correctly.
+
+### Install the dependencies
+
+```bash
+npm install
+```
+
+### List the installed dependencies
+
+```bash
+npm ls --depth=0
+```
+
+### Check for known dependency vulnerabilities
+
+```bash
+npm audit
+```
+
+The `npm audit` command checks the application's npm dependencies against known vulnerability advisories.
+
+### Update the affected dependency
+
+```bash
+npm install express@^4
+```
+
+Run the audit again:
+
+```bash
+npm audit
+```
+
+The dependency audit reported:
+
+```text
+found 0 vulnerabilities
+```
+
+This confirms that npm did not report known vulnerabilities in the dependency tree at the time of the audit. It does not guarantee that the complete Docker image is vulnerability-free.
+
+![NPM Dependencies](images/npm.png)
+
+![NPM Audit Results](images/4.png)
+
+---
+
+## 4. Optimize and Rebuild the Docker Image
+
+After inspecting the initial scan results, improve the Docker image to reduce its attack surface.
+
+The updated Dockerfile uses the following security practices:
+
+- **Lightweight base image:** Uses `node:22-alpine`.
+- **Production dependencies only:** Installs dependencies with `npm ci --omit=dev`.
+- **Reduced image contents:** Removes npm and npx after installing the application dependencies, as configured in the Dockerfile.
+- **Dependency cleanup:** Cleans the npm cache to avoid retaining unnecessary cache files.
+
+### Build the updated image
+
+```bash
+docker build --no-cache -t ivolve-app:v2 .
+```
+
+The `--no-cache` option forces Docker to rebuild the image layers instead of reusing cached build results.
+
+### Check the new image
+
+```bash
+docker images ivolve-app:v2
+```
+
+![Updated Docker Image](images/5.png)
+
+---
+
+## 5. Run and Verify the Updated Image
+
+Run a container from the updated image:
+
+```bash
+docker run --rm -d --name ivolve-test -p 3000:3000 ivolve-app:v2
+```
+
+### Check the running container
 
 ```bash
 docker ps
-docker logs container1
+docker logs ivolve-test
 ```
-
-![Container 1 Logs](images/2.png)
 
 ### Verify the application
 
 Open the application in your browser:
 
-[http://localhost:8080/](http://localhost:8080/)
+[http://localhost:3000](http://localhost:3000)
 
-![Application Running](images/3.png)
+The application should respond successfully if the container starts correctly and the application listens on the configured port.
 
-### Stop and remove the container
+![Application Running](images/localhost.png)
+
+### Stop the container
 
 ```bash
-docker stop container1
-docker rm container1
+docker stop ivolve-test
 ```
 
-These commands stop the container and remove it while keeping the original image.
+The `--rm` option automatically removes the container when it stops.
 
 ---
 
-## 2. Multi-Stage Dockerfile Optimization
+## 6. Scan the Updated Docker Image
 
-A multi-stage Dockerfile separates the build environment from the runtime environment.
+Run Trivy against the rebuilt image to evaluate the effect of the changes.
 
-- **Builder stage:** Uses Maven and JDK to build the application.
-- **Runtime stage:** Uses a lightweight JRE image and copies only the packaged JAR.
-- **Non-root user:** Runs the application as `appuser` instead of root.
-
-The optimized Dockerfile is saved as `Dockerfile.optimized`.
-
-### Build the optimized image
+### Run a complete scan
 
 ```bash
-docker build -f Dockerfile.optimized -t image2 .
+trivy image ivolve-app:v2
 ```
+
+### Check HIGH and CRITICAL vulnerabilities
+
+```bash
+trivy image --severity HIGH,CRITICAL ivolve-app:v2
+```
+
+### Generate the final HTML report
+
+```bash
+trivy image --severity HIGH,CRITICAL --format template --template "@html.tpl" -o trivy-high-critical-v2.html ivolve-app:v2
+```
+
+Open the report:
+
+```bash
+xdg-open trivy-high-critical-v2.html
+```
+
+Compare the initial and updated scan results to see whether the number and severity of reported vulnerabilities have changed.
+
+![Updated Trivy Scan](images/6.png)
+
+![Final Trivy Report](images/7.png)
 
 ---
 
-## 3. Compare Image Sizes
+## 7. Compare the Results
 
-Check the original and optimized image sizes:
+The initial scan revealed vulnerabilities in the image, including operating system packages and Node.js dependencies.
 
-```bash
-docker images image1
-docker images image2
-```
+After updating the application dependencies and rebuilding the Docker image, the final scan was used to verify the changes.
 
 ### Results
 
-| Image | Disk Usage | Content Size |
-|---|---:|---:|
-| `image1:latest` | 671 MB | 239 MB |
-| `image2:latest` | 323 MB | 91.8 MB |
+- The npm dependency audit reported zero vulnerabilities.
+- The Docker image was rebuilt using a lightweight Alpine base image.
+- Development dependencies and unnecessary tooling were excluded or removed according to the Dockerfile configuration.
+- The final Trivy scan was used to check for remaining HIGH and CRITICAL vulnerabilities.
 
-![Image Size Comparison](images/size.png)
-
-The optimized image has a smaller footprint because the final image does not include the Maven build environment and the full JDK.
-
-### Size reduction
-
-Based on the reported disk usage:
-
-The optimized image is approximately **51.9% smaller** by disk usage.
-
-Based on content size, the reduction is approximately **61.6%**.
-
----
-
-## 4. Run and Verify the Optimized Image
-
-Run a container from `image2`:
-
-```bash
-docker run -d --name container2 -p 8080:8080 image2
-```
-
-Check the container status and logs:
-
-```bash
-docker ps
-docker logs container2
-```
-
-![Optimized Container Logs](images/4.png)
-
-### Verify the application
-
-Open the application in your browser:
-
-[http://localhost:8080/](http://localhost:8080/)
-
-![Application Verification](images/3.png)
-
-### Verify the non-root user
-
-```bash
-docker exec container2 whoami
-```
-
-The expected output is:
-
-```text
-appuser
-```
-
-This confirms that the application container is running as a non-root user.
-
-![Non-Root User Verification](images/5.png)
-
-### Stop and remove the optimized container
-
-```bash
-docker stop container2
-docker rm container2
-```
-
----
-
-## 5. Export the Optimized Image
-
-Save `image2` as a TAR archive:
-
-```bash
-docker save -o lab4-image.tar image2
-```
-
-Verify that the archive exists:
-
-```bash
-ls -lh lab4-image.tar
-```
-
-The TAR file contains the Docker image and its layers, allowing the image to be transferred or restored without rebuilding it.
-
----
-
-## 6. Delete the Image from the Local Docker Host
-
-Remove the optimized image:
-
-```bash
-docker rmi image2
-```
-
-Verify that it is no longer listed:
-
-```bash
-docker images image2
-```
-
-![Image Removed](images/6.png)
-
----
-
-## 7. Load and Verify the Image
-
-Restore the image from the saved TAR archive:
-
-```bash
-docker load -i lab4-image.tar
-```
-
-Verify that the image has been restored:
-
-```bash
-docker images image2
-```
-
-The output should show `image2:latest` in the local Docker image list.
-
-![Image Restored](images/7.png)
+**Result:** The updated image showed no HIGH or CRITICAL vulnerabilities in the final scan, based on the recorded lab results. This does not mean that the image has no vulnerabilities of any severity.
 
 ---
 
@@ -218,11 +240,12 @@ The output should show `image2:latest` in the local Docker image list.
 
 In this lab, I:
 
-- Built and tested the original Docker image.
-- Created a multi-stage Dockerfile to optimize the image.
-- Configured the application to run as a non-root user.
-- Compared the original and optimized image sizes.
-- Exported the optimized image to a TAR archive.
-- Removed the local image and restored it using `docker load`.
+- Built and scanned the initial Docker image using Trivy.
+- Identified vulnerabilities in operating system packages and application dependencies.
+- Generated HTML vulnerability reports.
+- Inspected and updated npm dependencies.
+- Rebuilt the Docker image using a lightweight base image and production-only dependencies.
+- Ran the updated container and verified the application.
+- Scanned the final image and compared the security results.
 
-**Result:** The optimized image reduced the reported disk usage from 671 MB to 323 MB, approximately a 51.9% reduction, while retaining the application and its non-root runtime configuration.
+**Result:** The lab demonstrated how Trivy can be used to identify Docker image vulnerabilities and verify security improvements after updating dependencies and reducing unnecessary image contents.

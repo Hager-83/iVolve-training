@@ -1,0 +1,20 @@
+# Maven build output
+**/target/
+
+# Gradle build output
+**/build/
+
+# Gradle local cache
+**/.gradle/
+
+# Java compiled files
+*.class
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Operating system files
+.DS_Store
+Thumbs.db

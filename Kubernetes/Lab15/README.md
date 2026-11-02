@@ -589,4 +589,149 @@ Server started on http://0.0.0.0:3000
 
 ---
 
+## 9. Configure Docker Hub Image Pull Secret
+
+This section demonstrates how Kubernetes pulls an application image from Docker Hub using an `imagePullSecret`. The test was performed first with a public repository, then with the repository set to private.
+
+### 9.1 Verify the Application Image on the Worker
+
+Connect to the Worker node and check whether the application image already exists in the containerd image store.
+
+Run on the **Worker**:
+
+```bash
+sudo ctr -n k8s.io images list | grep ivolve-app
+```
+
+The image was found in the Worker containerd image store.
+
+![Application image on Worker](images/19.png)
+
+### 9.2 Check Docker Hub Repository Visibility
+
+Before configuring authentication, the Docker Hub repository was public.
+
+![Docker Hub public repository](images/dockerHub.png)
+
+![GIF](https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUyeWxscGVmaGp1NnBncmF4YnBzZ2dvdzNzajczYWsyMm16ODMydWpxciZlcD12MV9naWZzX3NlYXJjaCZjdD1n/1kp5oAqHMoEgw/200w.gif)
+
+### 9.3 Generate a Docker Hub Personal Access Token
+
+Create a Personal Access Token (PAT) from Docker Hub to use for Kubernetes image authentication.
+
+Use a read-only token with access to the repository being pulled. Keep the token private and do not add it to the README, Git repository, or screenshots.
+
+### 9.4 Create the Kubernetes Image Pull Secret
+
+Run on the **Master**:
+
+```bash
+read -r -p "Docker Hub username: " DOCKERHUB_USERNAME
+read -r -s -p "Docker Hub access token: " DOCKERHUB_TOKEN
+echo
+
+kubectl create secret docker-registry dockerhub-secret \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username="$DOCKERHUB_USERNAME" \
+  --docker-password="$DOCKERHUB_TOKEN" \
+  -n ivolve \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+unset DOCKERHUB_USERNAME DOCKERHUB_TOKEN
+```
+
+The Secret is created in the same namespace as the application Deployment.
+
+![Create Docker Hub credentials](images/20.png)
+
+Verify that the Secret exists:
+
+```bash
+kubectl get secret dockerhub-secret -n ivolve
+```
+
+![Image pull Secret](images/21.png)
+
+### 9.5 Attach the Secret to the Deployment
+
+Configure the Deployment Pod template to use `dockerhub-secret` when pulling container images.
+
+```bash
+kubectl patch deployment ivolveapp -n ivolve \
+  --type=strategic \
+  -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"dockerhub-secret"}]}}}}'
+```
+
+Verify the configuration:
+
+```bash
+kubectl get deployment ivolveapp -n ivolve \
+  -o jsonpath='{.spec.template.spec.imagePullSecrets[*].name}{"\n"}'
+```
+
+Expected output:
+
+```text
+dockerhub-secret
+```
+
+![Deployment imagePullSecrets configuration](images/22.png)
+
+![Verify imagePullSecret](images/23.png)
+
+### 9.6 Test Pulling from a Private Repository
+
+Change the Docker Hub repository visibility from Public to Private.
+
+![Docker Hub private repository](images/dockerHub1.png)
+
+Restart the Deployment to create a new Pod and trigger an image pull:
+
+```bash
+kubectl rollout restart deployment/ivolveapp -n ivolve
+```
+
+Wait for the rollout to complete:
+
+```bash
+kubectl rollout status deployment/ivolveapp -n ivolve \
+  --timeout=180s
+```
+
+The Deployment successfully rolled out using the configured image pull Secret.
+
+![Successful rollout with private image](images/24.png)
+
+### 9.7 Final Verification
+
+**Check the Deployment:**
+
+```bash
+kubectl get deployment ivolveapp -n ivolve
+```
+
+![Final Deployment status](images/26.png)
+
+**Check the application Pods:**
+
+```bash
+kubectl get pods -n ivolve -o wide
+```
+
+![Final Pod status](images/25.png)
+
+**Check the latest namespace events:**
+
+```bash
+kubectl get events -n ivolve --sort-by='.lastTimestamp' | tail -15
+```
+
+![Final Kubernetes events](images/27.png)
+
+The rollout completed successfully, and the application Pod became available after configuring the Docker Hub credentials.
+
+This test demonstrates how Kubernetes uses an `imagePullSecret` to authenticate against a private Docker Hub repository before pulling the application image.
+
+---
+
 **Lab Status:** The Deployment, Service, scheduling, and persistent storage setup have been successfully verified. Complete the final database and HTTP checks to confirm all lab requirements.

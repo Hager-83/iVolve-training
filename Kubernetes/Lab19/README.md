@@ -1,5 +1,7 @@
 # Lab 19 – Securing Kubernetes with RBAC and Service Accounts
 
+![Lab](images/Lab.png)
+
 ## 1. Create ServiceAccount
 
 Create a ServiceAccount named `jenkinssa` in the `ivolve` namespace.

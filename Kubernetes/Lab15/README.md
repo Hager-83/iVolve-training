@@ -619,7 +619,7 @@ Before configuring authentication, the Docker Hub repository was public.
 
 Create a Personal Access Token (PAT) from Docker Hub to use for Kubernetes image authentication.
 
-Use a read-only token with access to the repository being pulled. Keep the token private and do not add it to the README, Git repository, or screenshots.
+Use a read-only token with access to the repository being pulled.
 
 ### 9.4 Create the Kubernetes Image Pull Secret
 
@@ -723,7 +723,7 @@ kubectl get pods -n ivolve -o wide
 **Check the latest namespace events:**
 
 ```bash
-kubectl get events -n ivolve --sort-by='.lastTimestamp' | tail -15
+kubectl get events -n ivolve --sort-by='.lastTimestamp' | tail -10
 ```
 
 ![Final Kubernetes events](images/27.png)

@@ -1,0 +1,158 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ivolveapp
+  namespace: ivolve
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: ivolveApp
+
+  strategy:
+    type: Recreate
+
+  template:
+    metadata:
+      labels:
+        app: ivolveApp
+
+    spec:
+      nodeSelector:
+        project: ivolve
+
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: ivolveApp
+          effect: NoSchedule
+
+      imagePullSecrets:
+        - name: dockerhub-secret
+
+      initContainers:
+        - name: mysql-init
+          image: mysql:8.0
+          imagePullPolicy: IfNotPresent
+
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              export MYSQL_PWD="${MYSQL_ROOT_PASSWORD}"
+
+              echo "Waiting for MySQL..."
+              until mysqladmin ping -h "${DB_HOST}" -uroot --silent; do
+                sleep 5
+              done
+
+              echo "Creating database and granting privileges..."
+              mysql -h "${DB_HOST}" -uroot -e "
+                CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
+                GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'%';
+                FLUSH PRIVILEGES;
+              "
+
+              echo "Database initialization completed."
+
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ivolvecm
+                  key: DB_HOST
+
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ivolvecm
+                  key: DB_USER
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ivolvesecret
+                  key: DB_PASSWORD
+
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ivolvesecret
+                  key: MYSQL_ROOT_PASSWORD
+
+            - name: DB_NAME
+              value: ivolve
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+      containers:
+        - name: ivolve-app
+          image: hager83/ivolve-app:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ivolvecm
+                  key: DB_HOST
+
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ivolvecm
+                  key: DB_USER
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ivolvesecret
+                  key: DB_PASSWORD
+
+            - name: DB_NAME
+              value: ivolve
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+
+          volumeMounts:
+            - name: app-logs
+              mountPath: /app/logs
+
+      volumes:
+        - name: app-logs
+          persistentVolumeClaim:
+            claimName: ivolvepvc

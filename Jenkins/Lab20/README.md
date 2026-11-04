@@ -156,3 +156,5 @@ The account should not be able to:
 In this lab, Jenkins was installed and configured with Role-Based Authorization Strategy. Two users were created with different access levels: `user1` received administrative permissions, while `user2` received read-only permissions.
 
 This demonstrates how Jenkins access can be controlled by assigning roles and permissions to individual users.
+
+

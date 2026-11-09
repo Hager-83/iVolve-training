@@ -1,0 +1,9 @@
+---
+- name: Configure DevOps tools using Ansible Roles
+  hosts: managed_nodes
+  become: true
+
+  roles:
+    - docker
+    - kubectl
+    - jenkins

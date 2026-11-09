@@ -1,0 +1,67 @@
+
+---
+- name: Configure Docker, kubectl and Jenkins
+  hosts: managed_nodes
+  become: true
+
+  tasks:
+    # 1. Docker
+    - name: Install Docker
+      ansible.builtin.apt:
+        name: docker.io
+        state: present
+        update_cache: true
+
+    - name: Ensure Docker service is running
+      ansible.builtin.systemd_service:
+        name: docker
+        state: started
+        enabled: true
+
+    # 2. kubectl
+    - name: Install curl and required packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - gnupg
+          - openjdk-21-jre-headless
+        state: present
+
+    - name: Get stable kubectl version
+      ansible.builtin.uri:
+        url: https://dl.k8s.io/release/stable.txt
+        return_content: true
+      register: kubectl_version
+      changed_when: false
+
+    - name: Download kubectl binary
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version.content | trim }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+
+    # 3. Jenkins
+    - name: Download Jenkins repository signing key
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: "0644"
+
+    - name: Configure Jenkins APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        filename: jenkins
+        state: present
+        update_cache: true
+
+    - name: Install Jenkins
+      ansible.builtin.apt:
+        name: jenkins
+        state: present
+
+    - name: Start and enable Jenkins
+      ansible.builtin.systemd_service:
+        name: jenkins
+        state: started
+        enabled: true

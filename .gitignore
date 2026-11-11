@@ -1,23 +1,39 @@
-cat > .gitignore <<'EOF'
-# Maven build output
+# Maven
 **/target/
 
-# Gradle build output
+# Gradle
 **/build/
 **/.gradle/
 
-# Java compiled files
+# Java
 *.class
 
-# IDE files
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Ansible
+*.retry
+.ansible/
+
+# Secrets and credentials
+**/.env
+**/.env.*
+!**/.env.example
+.vault_pass*
+vault_password*
+*.vault-password
+.aws/
+*.pem
+*.key
+
+# IDE
 .idea/
 .vscode/
 *.iml
 
-# Operating system files
+# OS
 .DS_Store
 Thumbs.db
-
-# Environment variables
-**/.env
-EOF

@@ -1,0 +1,35 @@
+---
+# tasks file for rols/mysql
+- name: Install MySQL server and Python driver
+  ansible.builtin.apt:
+    name:
+      - mysql-server
+      - python3-pymysql
+    state: present
+    update_cache: true
+
+- name: Ensure MySQL service is running
+  ansible.builtin.service:
+    name: mysql
+    state: started
+    enabled: true
+
+- name: Create application database
+  ansible.mysql.mysql_db:
+    name: ivolve
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+
+- name: Create application database user
+  ansible.mysql.mysql_user:
+    name: ivolveuser
+    host: localhost
+    plugin: caching_sha2_password
+    plugin_auth_string: "{{ vault_mysql_password }}"
+    salt: "{{ vault_mysql_salt }}"
+    priv: "ivolve.*:ALL"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  no_log: true
+

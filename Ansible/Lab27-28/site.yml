@@ -1,0 +1,7 @@
+---
+- name: Provision MySQL on AWS EC2
+  hosts: server_ivolve
+  become: true
+
+  roles:
+    - mysql
